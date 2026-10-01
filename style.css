@@ -37,3 +37,6 @@ dialog::backdrop{background:#000a}
 dialog p{color:var(--mut);font-size:.9rem}
 @media(max-width:520px){.row button{flex:1 1 100%}}
 @media(prefers-reduced-motion:no-preference){.bar i{transition:width .2s}}
+.hint{color:var(--mut);font-size:.85rem;margin:0 0 10px}
+#files li{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}
+#files li.drag{outline:2px solid var(--red);background:#2a1519;cursor:grabbing}
