@@ -50,7 +50,7 @@ function addFiles(list) {
 const isActive = i => i.parsed && !i.excluded && i.status !== 'error';
 function analyze() {
   const it = state.items, lim = limit();
-  it.sort((x, y) => (x.parsed === y.parsed ? 0 : x.parsed ? -1 : 1) || x.start - y.start || x.end - y.end || x.file.name.localeCompare(y.file.name, undefined, { numeric: true }));
+  if (!state.manual) it.sort((x, y) => (x.parsed === y.parsed ? 0 : x.parsed ? -1 : 1) || x.start - y.start || x.end - y.end || x.file.name.localeCompare(y.file.name, undefined, { numeric: true }));
 
   // Nombre del manga: el más frecuente
   const cnt = {};
@@ -75,7 +75,7 @@ function analyze() {
   // Capítulos faltantes (sobre archivos interpretables)
   state.missing = [];
   let maxEnd = null;
-  it.filter(i => i.parsed && !i.excluded).forEach(i => {
+  [...it].filter(i => i.parsed && !i.excluded).sort((x, y) => x.start - y.start || x.end - y.end).forEach(i => {
     if (maxEnd !== null && Math.ceil(i.start) - Math.floor(maxEnd) > 1) {
       const a = Math.floor(maxEnd) + 1, b = Math.ceil(i.start) - 1;
       state.missing.push(rng(a, b));
@@ -95,7 +95,7 @@ function buildBatches() {
     if (!cur || cur.size + f.size > lim) batches.push(cur = { files: [], size: 0 });
     cur.files.push(f); cur.size += f.size;
   }
-  batches.forEach(b => { b.min = b.files[0].start; b.max = Math.max(...b.files.map(f => f.end)); });
+  batches.forEach(b => { b.min = Math.min(...b.files.map(f => f.start)); b.max = Math.max(...b.files.map(f => f.end)); });
   return batches;
 }
 
@@ -124,10 +124,11 @@ function render() {
     const cls = i.status === 'done' ? 'done' : i.status === 'error' ? 'error' : (!i.parsed || i.dupKey || i.size > limit()) ? 'warn' : 'pending';
     const ico = { done: '✅', error: '❌', warn: '⚠️', pending: '⏳' }[cls];
     const stTxt = i.status === 'done' ? 'Procesado' : i.status === 'error' ? 'Error: ' + i.err : !i.parsed ? 'Rango no reconocido' : i.excluded ? 'Duplicado omitido' : i.dupKey ? 'Duplicado (conservado)' : i.size > limit() ? 'Demasiado grande' : 'Pendiente';
-    return `<li class="${cls} ${i.excluded ? 'off' : ''}"><span class="info"><b>${ico} ${esc(i.file.name)}</b><small>${fmtSize(i.size)} · Capítulos: ${i.parsed ? rng(i.start, i.end) : '?'} · ${esc(stTxt)}</small></span>
+    return `<li data-n="${n}" class="${cls} ${i.excluded ? 'off' : ''}"><span class="info"><b>⠿ ${ico} ${esc(i.file.name)}</b><small>${fmtSize(i.size)} · Capítulos: ${i.parsed ? rng(i.start, i.end) : '?'} · ${esc(stTxt)}</small></span>
       <span>${!i.parsed ? `<button data-a="set" data-n="${n}">Asignar capítulos</button>` : ''}${i.dupKey && !i.keep ? `<button data-a="keep" data-n="${n}">Conservar este</button>` : ''}
       <button data-a="rm" data-n="${n}" aria-label="Quitar">✕</button></span></li>`;
   }).join('');
+  $('#auto').hidden = !state.manual;
   $('#go').disabled = state.running || !bs.length;
 }
 
@@ -140,18 +141,37 @@ function askName(def, size) {
     d.showModal();
   });
 }
-function download(blob, name) {
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name + '.pdf';
-  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+/* Guarda el PDF. Devuelve false si el usuario cancela. */
+async function saveFile(data, name) {
+  const fileName = name + '.pdf';
+  // 1) Chrome/Edge (PC y Android): escribe directo a disco, sin crear un Blob (evita duplicar RAM)
+  if (window.showSaveFilePicker) {
+    try {
+      const h = await showSaveFilePicker({ suggestedName: fileName, types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }] });
+      const w = await h.createWritable(); await w.write(data); await w.close(); return true;
+    } catch (e) { if (e.name === 'AbortError') return false; console.warn(e); }
+  }
+  const blob = new Blob([data], { type: 'application/pdf' });
+  // 2) iPhone/iPad: el menú Compartir guarda en Archivos sin que Safari abra el PDF y saque al usuario de la página
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const file = new File([blob], fileName, { type: 'application/pdf' });
+  if (ios && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return true; } catch (e) { if (e.name === 'AbortError') return false; }
+  }
+  // 3) Enlace clásico (Firefox, etc.). Se libera la URL a los 5 min, no antes.
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fileName; a.rel = 'noopener';
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 300000);
+  return true;
 }
 async function run() {
   if (state.running) return;
   const batches = buildBatches(); if (!batches.length) return;
+  let aborted = false;
   state.running = true; $('#prog').hidden = false; render();
   for (let n = 0; n < batches.length; n++) {
     const b = batches[n]; let cur = null, bytes = 0;
     try {
-      const out = await PDFLib.PDFDocument.create(); let read = 0;
+      let out = await PDFLib.PDFDocument.create(); let read = 0;
       for (const f of b.files) {
         cur = f;
         $('#prog').innerHTML = `<h2>Procesando lote ${n + 1} de ${batches.length}</h2><div>${esc(state.manga)} ${rng(b.min, b.max)}</div><div class="bar"><i style="width:${read / b.size * 100}%"></i></div><small>${Math.round(read / b.size * 100)}% · ${esc(f.file.name)}</small>`;
@@ -163,9 +183,13 @@ async function run() {
       cur = null;
       $('#prog').innerHTML = `<h2>Lote ${n + 1} de ${batches.length}: guardando…</h2><div class="bar"><i style="width:100%"></i></div>`;
       await tick();
-      const data = await out.save(); bytes = data.length;
+      let data = await out.save(); bytes = data.length;
+      if (!bytes) throw new Error('el PDF generado está vacío');
+      out = null; // libera memoria antes de crear el archivo
       const name = await askName(`(${b.min} - ${b.max}) ${state.manga}`, bytes);
-      download(new Blob([data], { type: 'application/pdf' }), name);
+      const saved = await saveFile(data, name);
+      data = null;
+      if (!saved) { aborted = true; note('⚠️', 'Descarga cancelada. El lote sigue pendiente.'); break; }
       b.files.forEach(f => f.status = 'done');
       state.doneBatches.push({ name: name + '.pdf', r: rng(b.min, b.max), size: bytes });
       note('🔔', `Lote terminado: se creó correctamente ${name}.pdf`);
@@ -176,7 +200,7 @@ async function run() {
     await tick();
   }
   state.running = false; $('#prog').hidden = true;
-  note('🔔', 'Proceso terminado: todos los archivos compatibles fueron procesados.');
+  if (!aborted) note('🔔', 'Proceso terminado: todos los archivos compatibles fueron procesados.');
 }
 
 /* ---------- 7. Eventos ---------- */
@@ -187,7 +211,7 @@ const drop = $('#drop');
 drop.addEventListener('drop', e => addFiles(e.dataTransfer.files));
 $('#max').oninput = render;
 $('#go').onclick = run;
-$('#clear').onclick = () => { if (!state.running) { state.items = []; state.events = []; state.doneBatches = []; $('#app').hidden = true; render(); } };
+$('#clear').onclick = () => { if (!state.running) { state.items = []; state.events = []; state.doneBatches = []; state.manual = false; $('#app').hidden = true; render(); } };
 $('#files').onclick = e => {
   const b = e.target.closest('button'); if (!b || state.running) return;
   const i = state.items[+b.dataset.n];
@@ -199,3 +223,39 @@ $('#files').onclick = e => {
   }
   render();
 };
+
+$('#auto').onclick = () => { state.manual = false; render(); };
+
+/* ---------- 8. Diagnóstico ---------- */
+window.addEventListener('error', e => note('❌', `Error de JavaScript: ${e.message}`));
+window.addEventListener('unhandledrejection', e => note('❌', `Error: ${(e.reason && e.reason.message) || e.reason}`));
+// Si algo intenta recargar la página mientras se procesa, el navegador pide confirmación
+window.addEventListener('beforeunload', e => { if (state.running) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ---------- 9. Reordenar: mantener presionado y arrastrar ---------- */
+(() => {
+  const ul = $('#files'); let timer = null, drag = null, sx = 0, sy = 0;
+  const stop = () => { clearTimeout(timer); timer = null; };
+  ul.addEventListener('pointerdown', e => {
+    const li = e.target.closest('li[data-n]');
+    if (!li || e.target.closest('button') || state.running || e.button > 0) return;
+    try { ul.setPointerCapture(e.pointerId); } catch (_) {}
+    sx = e.clientX; sy = e.clientY;
+    timer = setTimeout(() => { drag = li; li.classList.add('drag'); if (navigator.vibrate) navigator.vibrate(30); }, 350);
+  });
+  document.addEventListener('pointermove', e => {
+    if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 8) stop(); // se movió antes de tiempo: es scroll
+    if (!drag) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY), t = el && el.closest('#files li[data-n]');
+    if (t && t !== drag) { const r = t.getBoundingClientRect(); ul.insertBefore(drag, e.clientY < r.top + r.height / 2 ? t : t.nextSibling); }
+    if (e.clientY < 70) scrollBy(0, -12); else if (e.clientY > innerHeight - 70) scrollBy(0, 12);
+  });
+  ul.addEventListener('touchmove', e => { if (drag) e.preventDefault(); }, { passive: false }); // evita que la pantalla haga scroll
+  ul.addEventListener('contextmenu', e => e.preventDefault());
+  const end = () => {
+    stop(); if (!drag) return;
+    const items = [...ul.children].map(li => state.items[+li.dataset.n]);
+    drag = null; state.items = items; state.manual = true; render();
+  };
+  document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+})();
