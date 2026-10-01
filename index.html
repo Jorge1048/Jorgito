@@ -1,48 +1,802 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Manga PDF Manager</title>
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manga PDF Manager</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- SortableJS -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <!-- PDF-Lib -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        manga: { dark: '#0f172a', card: '#1e293b', primary: '#f97316', secondary: '#38bdf8', danger: '#ef4444', success: '#22c55e', warning: '#eab308' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; overflow-x: hidden; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #f97316; }
+        
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        
+        /* Drag & Drop Styles */
+        .drop-active { border-color: #f97316 !important; background-color: rgba(249, 115, 22, 0.1) !important; }
+        .sortable-ghost { opacity: 0.4; background-color: #334155; }
+        
+        /* Progress Bar Animation */
+        .progress-bar-stripes {
+            background-image: linear-gradient(45deg, rgba(255, 255, 255, 0.15) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.15) 75%, transparent 75%, transparent);
+            background-size: 1rem 1rem;
+            animation: progress-stripes 1s linear infinite;
+        }
+        @keyframes progress-stripes { from { background-position: 1rem 0; } to { background-position: 0 0; } }
+        
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
 </head>
-<body>
-<header>
-  <h1>MANGA PDF MANAGER</h1>
-  <p>Todo se procesa en tu navegador. Ningún PDF sale de tu dispositivo.</p>
-</header>
-<main>
-  <label id="drop" class="card drop">
-    <input id="file" type="file" accept=".pdf,application/pdf" multiple hidden>
-    <b>📂 Seleccionar archivos PDF</b>
-    <small>o arrástralos hasta aquí</small>
-  </label>
+<body class="antialiased min-h-screen flex flex-col">
 
-  <section id="app" hidden>
-    <div class="card"><div class="stats" id="stats"></div></div>
-    <div class="card row">
-      <label>Tamaño máximo por archivo (GB)
-        <input id="max" type="number" min="0.1" step="0.1" value="2"></label>
-      <button id="go" class="primary">📚 CREAR PDFs</button>
-      <button id="auto" hidden>↕ Orden automático</button>
-      <button id="clear">Limpiar</button>
+    <nav class="glass-panel sticky top-0 z-40 border-b border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <div class="bg-manga-primary p-2 rounded-lg text-white">
+                        <i class="fa-solid fa-book-open"></i>
+                    </div>
+                    <span class="font-bold text-xl tracking-tight text-white">Manga PDF Manager</span>
+                </div>
+                <div class="text-sm text-gray-400 hidden sm:block">
+                    <i class="fa-solid fa-lock mr-1"></i> Procesamiento 100% Local
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <div class="lg:col-span-5 flex flex-col gap-6">
+            
+            <!-- Dropzone -->
+            <div id="dropzone" class="glass-panel rounded-2xl border-2 border-dashed border-gray-600 p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 hover:border-manga-primary hover:bg-gray-800/50 group">
+                <input type="file" id="file-input" multiple accept=".pdf" class="hidden">
+                <div class="text-6xl text-gray-500 mb-4 group-hover:text-manga-primary transition-colors duration-300">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                </div>
+                <h3 class="text-xl font-semibold mb-2">Seleccionar o Arrastrar PDFs</h3>
+                <p class="text-sm text-gray-400 max-w-xs mx-auto">Selecciona archivos de tu colección. No se subirán a internet.</p>
+                <button class="mt-6 bg-gray-700 hover:bg-gray-600 text-white py-2 px-6 rounded-full font-medium transition-colors border border-gray-600" onclick="document.getElementById('file-input').click()">
+                    Explorar Archivos
+                </button>
+            </div>
+
+            <!-- Dashboard Summary -->
+            <div class="glass-panel rounded-2xl p-6">
+                <h2 class="text-lg font-bold mb-4 flex items-center gap-2 border-b border-gray-700 pb-2">
+                    <i class="fa-solid fa-chart-pie text-manga-secondary"></i> Resumen
+                </h2>
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div class="bg-gray-800 p-3 rounded-lg">
+                        <span class="text-gray-400 block text-xs uppercase tracking-wider">Archivos</span>
+                        <span id="dash-files" class="text-xl font-bold">0</span>
+                    </div>
+                    <div class="bg-gray-800 p-3 rounded-lg">
+                        <span class="text-gray-400 block text-xs uppercase tracking-wider">Tamaño Total</span>
+                        <span id="dash-size" class="text-xl font-bold">0 B</span>
+                    </div>
+                    <div class="bg-gray-800 p-3 rounded-lg col-span-2">
+                        <span class="text-gray-400 block text-xs uppercase tracking-wider">Manga Detectado</span>
+                        <span id="dash-manga" class="text-md font-semibold truncate block text-manga-primary">-</span>
+                    </div>
+                    <div class="bg-gray-800 p-3 rounded-lg">
+                        <span class="text-gray-400 block text-xs uppercase tracking-wider">Capítulos</span>
+                        <span id="dash-chapters" class="font-bold">-</span>
+                    </div>
+                    <div class="bg-gray-800 p-3 rounded-lg">
+                        <span class="text-gray-400 block text-xs uppercase tracking-wider">Procesado</span>
+                        <span id="dash-processed" class="font-bold text-manga-success">0 B</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notifications Panel -->
+            <div class="glass-panel rounded-2xl p-6 flex-grow flex flex-col">
+                <h2 class="text-lg font-bold mb-4 flex items-center gap-2 border-b border-gray-700 pb-2">
+                    <i class="fa-solid fa-bell text-manga-warning"></i> Notificaciones
+                </h2>
+                <div id="notifications-list" class="flex-grow overflow-y-auto max-h-60 space-y-3 pr-2">
+                    <div class="text-gray-500 text-sm text-center py-4 italic">Aún no hay notificaciones.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-7 flex flex-col gap-6">
+            
+            <!-- Controls & Batches -->
+            <div class="glass-panel rounded-2xl p-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold">Lotes de Procesamiento</h2>
+                        <p class="text-sm text-gray-400">Archivos agrupados (Máx <span id="max-size-display">2</span> GB)</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-2 text-sm bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-700">
+                            <label for="max-size-select" class="text-gray-400">Límite:</label>
+                            <select id="max-size-select" class="bg-transparent text-white outline-none">
+                                <option value="1">1 GB</option>
+                                <option value="2" selected>2 GB</option>
+                                <option value="3">3 GB</option>
+                            </select>
+                        </div>
+                        <button id="btn-process" disabled class="bg-manga-primary hover:bg-orange-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-bold shadow-lg transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-layer-group"></i> CREAR PDFs
+                        </button>
+                    </div>
+                </div>
+
+                <div id="batches-container" class="space-y-4">
+                    <div class="text-gray-500 text-center py-8 italic border-2 border-dashed border-gray-700 rounded-xl">
+                        Agrega archivos para generar los lotes.
+                    </div>
+                </div>
+            </div>
+
+            <!-- File List (Sortable) -->
+            <div class="glass-panel rounded-2xl p-6 flex-grow flex flex-col">
+                <div class="flex justify-between items-end border-b border-gray-700 pb-2 mb-4">
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-list-ol text-manga-secondary"></i> Orden de Archivos
+                    </h2>
+                    <span class="text-xs text-gray-400"><i class="fa-solid fa-arrows-up-down"></i> Arrastra para reordenar</span>
+                </div>
+                
+                <div class="flex-grow overflow-y-auto" style="max-height: 500px;">
+                    <ul id="file-list" class="space-y-2 pr-2">
+                        <!-- List items will be injected here -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Filename Prompt Modal -->
+    <div id="filename-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-manga-card border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl fade-in">
+            <h3 class="text-xl font-bold mb-2 text-white">Nombrar Archivo</h3>
+            <p id="filename-modal-desc" class="text-sm text-gray-400 mb-4">Revisa el nombre del archivo antes de generarlo.</p>
+            
+            <div class="mb-6">
+                <label class="block text-xs uppercase tracking-wider text-gray-400 mb-1">Nombre del Archivo</label>
+                <div class="flex items-center bg-gray-900 rounded-lg border border-gray-700 overflow-hidden focus-within:border-manga-primary transition-colors">
+                    <input type="text" id="filename-input" class="w-full bg-transparent text-white px-4 py-2 outline-none">
+                    <span class="px-4 text-gray-500 bg-gray-800 border-l border-gray-700">.pdf</span>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button id="btn-cancel-process" class="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors">Cancelar Todo</button>
+                <button id="btn-confirm-filename" class="px-4 py-2 rounded-lg bg-manga-primary hover:bg-orange-500 text-white font-bold transition-colors">Confirmar y Generar</button>
+            </div>
+        </div>
     </div>
-    <div class="card" id="prog" hidden></div>
-    <div class="card"><h2>🔔 Notificaciones</h2><ul id="notes"></ul></div>
-    <div class="card"><h2>Lotes pendientes</h2><div id="batches"></div></div>
-    <div class="card"><h2>Archivos</h2><p class="hint">Mantén presionado un archivo y arrástralo para cambiar su posición.</p><ul id="files"></ul></div>
-  </section>
-</main>
 
-<dialog id="dlg">
-  <h3>Nombre del archivo</h3>
-  <input id="nm" aria-label="Nombre del archivo">
-  <p id="dinfo"></p>
-  <button id="dl" class="primary">⬇️ Descargar</button>
-</dialog>
+    <!-- Processing Overlay -->
+    <div id="processing-overlay" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[60] hidden flex flex-col items-center justify-center p-4">
+        <div class="max-w-lg w-full bg-manga-card p-8 rounded-2xl border border-gray-700 shadow-2xl text-center">
+            <div class="text-5xl text-manga-primary mb-6 animate-bounce">
+                <i class="fa-solid fa-file-pdf"></i>
+            </div>
+            <h2 id="process-title" class="text-2xl font-bold mb-2">Procesando Lote 1 de X</h2>
+            <p id="process-desc" class="text-gray-400 mb-8 truncate">Combinando archivos...</p>
+            
+            <div class="w-full bg-gray-800 rounded-full h-4 mb-2 overflow-hidden border border-gray-700">
+                <div id="process-progress-bar" class="bg-manga-secondary h-4 rounded-full progress-bar-stripes transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-sm font-bold">
+                <span id="process-status" class="text-gray-400">Preparando...</span>
+                <span id="process-percent" class="text-manga-secondary">0%</span>
+            </div>
+            
+            <div class="mt-8 text-xs text-gray-500">
+                <i class="fa-solid fa-triangle-exclamation text-manga-warning mr-1"></i> Por favor, no cierres esta pestaña.
+            </div>
+        </div>
+    </div>
 
-<!-- pdf-lib: única petición externa (solo descarga la librería; los PDFs nunca se envían) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-<script src="script.js"></script>
+    <script>
+        // Application State
+        const state = {
+            files: [], // Array of FileData objects
+            batches: [],
+            totalSize: 0,
+            processedSize: 0,
+            mangaTitleFallback: "Manga",
+            maxBatchSize: 2 * 1024 * 1024 * 1024, // Default 2GB
+            isProcessing: false,
+            notifications: [],
+            currentProcessIndex: 0,
+            cancelRequested: false
+        };
+
+        // Utility: Format Bytes
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        // Utility: Generate Unique ID
+        function generateId() {
+            return Math.random().toString(36).substr(2, 9);
+        }
+
+        // DOM Elements
+        const DOM = {
+            dropzone: document.getElementById('dropzone'),
+            fileInput: document.getElementById('file-input'),
+            fileList: document.getElementById('file-list'),
+            batchesContainer: document.getElementById('batches-container'),
+            dashFiles: document.getElementById('dash-files'),
+            dashSize: document.getElementById('dash-size'),
+            dashManga: document.getElementById('dash-manga'),
+            dashChapters: document.getElementById('dash-chapters'),
+            dashProcessed: document.getElementById('dash-processed'),
+            notificationsList: document.getElementById('notifications-list'),
+            btnProcess: document.getElementById('btn-process'),
+            maxSizeSelect: document.getElementById('max-size-select'),
+            maxSizeDisplay: document.getElementById('max-size-display'),
+            // Modals
+            filenameModal: document.getElementById('filename-modal'),
+            filenameInput: document.getElementById('filename-input'),
+            filenameModalDesc: document.getElementById('filename-modal-desc'),
+            btnConfirmFilename: document.getElementById('btn-confirm-filename'),
+            btnCancelProcess: document.getElementById('btn-cancel-process'),
+            // Overlay
+            processingOverlay: document.getElementById('processing-overlay'),
+            processTitle: document.getElementById('process-title'),
+            processDesc: document.getElementById('process-desc'),
+            progressBar: document.getElementById('process-progress-bar'),
+            processStatus: document.getElementById('process-status'),
+            processPercent: document.getElementById('process-percent')
+        };
+
+        let sortableInstance = null;
+
+        /**
+         * Parses filename to extract Manga name, Start Chap, End Chap.
+         * Handles various formats like "Naruto 01-17", "Naruto Cap 5", "(30-38).pdf"
+         */
+        function parseFilename(filename) {
+            const nameWithoutExt = filename.replace(/\.pdf$/i, '').trim();
+            
+            // Regex explanation:
+            // (.*?) : Capture group 1 -> Everything before the chapter numbers (Manga Name)
+            // [-\s_]* : Optional separators
+            // (?:cap|chapter|ch|vol)?s?\.? : Optional keywords like "cap", "chapter", "vol" ignoring case
+            // [\s_]* : Optional separators
+            // \(?\[? : Optional opening brackets
+            // (\d+(?:\.\d+)?) : Capture group 2 -> Start chapter number (allows decimals like 1.5)
+            // (?:[\s\-_]+(?:al|to)?[\s\-_]*(\d+(?:\.\d+)?))? : Non-capturing group for range, Capture group 3 -> End chapter
+            // \]?\)? : Optional closing brackets
+            // $ : End of string
+            const regex = /^(.*?)[-\s_]*(?:cap|chapter|ch|vol)?s?\.?[\s_]*\(?\[?(\d+(?:\.\d+)?)(?:[\s\-_]+(?:al|to)?[\s\-_]*(\d+(?:\.\d+)?))?\]?\)?$/i;
+            
+            const match = nameWithoutExt.match(regex);
+            
+            let mangaName = nameWithoutExt;
+            let start = null;
+            let end = null;
+            let isRecognized = false;
+
+            if (match && match[2]) {
+                mangaName = match[1].replace(/[-_]+$/, '').trim() || "Manga Desconocido";
+                start = parseFloat(match[2]);
+                end = match[3] ? parseFloat(match[3]) : start; // If no end chapter, it's a single chapter file
+                isRecognized = true;
+            } else {
+                // Try a simpler fallback: just find the last numbers
+                const simpleRegex = /(\d+(?:\.\d+)?)(?:-(\d+(?:\.\d+)?))?[^\d]*$/;
+                const simpleMatch = nameWithoutExt.match(simpleRegex);
+                if(simpleMatch) {
+                    start = parseFloat(simpleMatch[1]);
+                    end = simpleMatch[2] ? parseFloat(simpleMatch[2]) : start;
+                    mangaName = nameWithoutExt.replace(simpleMatch[0], '').trim();
+                    isRecognized = true;
+                }
+            }
+
+            // Cleanup manga name (remove trailing hyphens, brackets)
+            mangaName = mangaName.replace(/^[\[\(-_]+|[\]\)-_]+$/g, '').trim();
+            if(!mangaName) mangaName = "Manga";
+
+            return { mangaName, start, end, isRecognized, cleanName: nameWithoutExt };
+        }
+
+        function analyzeFiles(filesToAnalyze) {
+            state.notifications = [];
+            
+            if (filesToAnalyze.length === 0) {
+                state.mangaTitleFallback = "-";
+                return;
+            }
+
+            // Detect dominant manga name
+            const names = filesToAnalyze.map(f => f.mangaName).filter(n => n && n !== "Manga");
+            if (names.length > 0) {
+                const nameCounts = {};
+                let maxCount = 0;
+                names.forEach(n => {
+                    nameCounts[n] = (nameCounts[n] || 0) + 1;
+                    if (nameCounts[n] > maxCount) {
+                        maxCount = nameCounts[n];
+                        state.mangaTitleFallback = n;
+                    }
+                });
+            }
+
+            // Find missing and duplicates based on current visual order
+            for (let i = 0; i < filesToAnalyze.length - 1; i++) {
+                const current = filesToAnalyze[i];
+                const next = filesToAnalyze[i+1];
+
+                if (!current.isRecognized || !next.isRecognized) continue;
+                if (current.status === 'error' || next.status === 'error') continue;
+
+                // Check duplicates (overlapping ranges)
+                if (
+                    (next.start >= current.start && next.start <= current.end) || 
+                    (current.start === next.start && current.end === next.end)
+                ) {
+                    addNotification(`Posible duplicado detectado entre capítulos ${current.start}-${current.end} y ${next.start}-${next.end}.`, 'warning');
+                    current.status = 'warning';
+                    next.status = 'warning';
+                } 
+                // Check missing (gap greater than 1, ignoring decimals for simplicity in warning)
+                else if (Math.floor(next.start) > Math.floor(current.end) + 1) {
+                    const missingStart = Math.floor(current.end) + 1;
+                    const missingEnd = Math.floor(next.start) - 1;
+                    const rangeStr = missingStart === missingEnd ? missingStart : `${missingStart}-${missingEnd}`;
+                    addNotification(`Posible salto o capítulos faltantes: ${rangeStr}.`, 'info');
+                }
+            }
+
+            // Check unrecognized and sizes
+            filesToAnalyze.forEach(f => {
+                if (!f.isRecognized && f.status === 'pending') {
+                    addNotification(`No se pudo determinar el rango del archivo: "${f.file.name}". Revísalo.`, 'error');
+                    f.status = 'warning';
+                }
+                if (f.size > state.maxBatchSize && f.status !== 'processed') {
+                    addNotification(`Archivo individual supera el límite (${formatBytes(f.size)}): "${f.file.name}". No se incluirá en lotes normales.`, 'error');
+                    f.status = 'error';
+                }
+            });
+        }
+
+        function calculateBatches() {
+            state.batches = [];
+            let currentBatch = { id: generateId(), size: 0, files: [], startChap: null, endChap: null, status: 'pending' };
+            
+            // Only batch pending or warning files (ignore processed and errors > 2GB)
+            const processableFiles = state.files.filter(f => f.status !== 'processed' && f.status !== 'error');
+
+            processableFiles.forEach(file => {
+                if (currentBatch.size + file.size > state.maxBatchSize && currentBatch.files.length > 0) {
+                    // Push current batch and start new
+                    state.batches.push(currentBatch);
+                    currentBatch = { id: generateId(), size: 0, files: [], startChap: null, endChap: null, status: 'pending' };
+                }
+                
+                currentBatch.files.push(file);
+                currentBatch.size += file.size;
+                
+                if (file.isRecognized) {
+                    if (currentBatch.startChap === null || file.start < currentBatch.startChap) currentBatch.startChap = file.start;
+                    if (currentBatch.endChap === null || file.end > currentBatch.endChap) currentBatch.endChap = file.end;
+                }
+            });
+
+            if (currentBatch.files.length > 0) {
+                state.batches.push(currentBatch);
+            }
+
+            DOM.btnProcess.disabled = state.batches.length === 0;
+        }
+
+        async function handleFiles(fileList) {
+            const newFiles = Array.from(fileList).filter(f => f.type === 'application/pdf');
+            if (newFiles.length === 0) return;
+
+            const processedNewFiles = newFiles.map(file => {
+                const parsed = parseFilename(file.name);
+                return {
+                    id: generateId(),
+                    file: file,
+                    name: file.name,
+                    size: file.size,
+                    mangaName: parsed.mangaName,
+                    start: parsed.start,
+                    end: parsed.end,
+                    isRecognized: parsed.isRecognized,
+                    status: 'pending' // pending, processed, warning, error
+                };
+            });
+
+            // Append and sort numerically by default
+            state.files = [...state.files, ...processedNewFiles];
+            state.files.sort((a, b) => {
+                if (a.isRecognized && b.isRecognized) return a.start - b.start;
+                if (a.isRecognized) return -1;
+                if (b.isRecognized) return 1;
+                return 0; // Keep order if both unrecognized
+            });
+
+            updateStateAndUI();
+        }
+
+        function updateStateAndUI() {
+            state.totalSize = state.files.reduce((acc, f) => acc + f.size, 0);
+            
+            // Reset statuses (except processed/error) before re-analysis
+            state.files.forEach(f => {
+                if (f.status === 'warning') f.status = 'pending';
+            });
+
+            analyzeFiles(state.files);
+            calculateBatches();
+            renderUI();
+        }
+
+        function addNotification(message, type) {
+            state.notifications.push({ id: generateId(), message, type, time: new Date() });
+        }
+
+        function getStatusIcon(status) {
+            switch(status) {
+                case 'processed': return '<i class="fa-solid fa-circle-check text-manga-success" title="Procesado"></i>';
+                case 'warning': return '<i class="fa-solid fa-triangle-exclamation text-manga-warning" title="Advertencia"></i>';
+                case 'error': return '<i class="fa-solid fa-circle-xmark text-manga-danger" title="Error / Omitido"></i>';
+                default: return '<i class="fa-solid fa-clock text-gray-500" title="Pendiente"></i>';
+            }
+        }
+
+        function renderUI() {
+            // Dashboard
+            DOM.dashFiles.textContent = state.files.length;
+            DOM.dashSize.textContent = formatBytes(state.totalSize);
+            DOM.dashManga.textContent = state.mangaTitleFallback;
+            DOM.dashProcessed.textContent = formatBytes(state.processedSize);
+            
+            // Calculate global chapter range
+            let minC = Infinity, maxC = -Infinity;
+            state.files.forEach(f => {
+                if (f.isRecognized) {
+                    if (f.start < minC) minC = f.start;
+                    if (f.end > maxC) maxC = f.end;
+                }
+            });
+            DOM.dashChapters.textContent = minC !== Infinity ? `${minC} - ${maxC}` : '-';
+
+            // Notifications
+            DOM.notificationsList.innerHTML = '';
+            if (state.notifications.length === 0) {
+                DOM.notificationsList.innerHTML = '<div class="text-gray-500 text-sm text-center py-4 italic">Todo en orden.</div>';
+            } else {
+                state.notifications.forEach(notif => {
+                    const iconColor = notif.type === 'error' ? 'text-manga-danger' : (notif.type === 'warning' ? 'text-manga-warning' : 'text-manga-secondary');
+                    const iconClass = notif.type === 'error' ? 'fa-circle-xmark' : (notif.type === 'warning' ? 'fa-triangle-exclamation' : 'fa-info-circle');
+                    
+                    DOM.notificationsList.innerHTML += `
+                        <div class="bg-gray-800/50 rounded-lg p-3 text-sm flex gap-3 items-start border border-gray-700 fade-in">
+                            <i class="fa-solid ${iconClass} ${iconColor} mt-0.5"></i>
+                            <span class="text-gray-300 leading-tight">${notif.message}</span>
+                        </div>
+                    `;
+                });
+            }
+
+            // File List
+            DOM.fileList.innerHTML = '';
+            state.files.forEach(file => {
+                const li = document.createElement('li');
+                li.className = 'bg-gray-800 p-3 rounded-lg flex items-center justify-between border border-gray-700 cursor-grab active:cursor-grabbing hover:bg-gray-750 transition-colors group';
+                li.dataset.id = file.id;
+                
+                const rangeText = file.isRecognized ? `Caps: ${file.start}${file.start !== file.end ? '-'+file.end : ''}` : 'Desconocido';
+                
+                li.innerHTML = `
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <i class="fa-solid fa-grip-vertical text-gray-500 opacity-50 group-hover:opacity-100"></i>
+                        <div class="flex flex-col min-w-0">
+                            <span class="font-medium text-sm text-white truncate" title="${file.name}">${file.name}</span>
+                            <div class="flex gap-3 text-xs text-gray-400 mt-1">
+                                <span>${formatBytes(file.size)}</span>
+                                <span class="bg-gray-900 px-2 rounded-full border border-gray-700">${rangeText}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ml-4 flex-shrink-0 flex items-center gap-4">
+                        <div class="text-lg">${getStatusIcon(file.status)}</div>
+                        <button onclick="removeFile('${file.id}')" class="text-gray-500 hover:text-manga-danger transition-colors p-1" title="Eliminar">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                `;
+                DOM.fileList.appendChild(li);
+            });
+
+            // Initialize Sortable if not already
+            if (!sortableInstance && state.files.length > 0) {
+                sortableInstance = new Sortable(DOM.fileList, {
+                    animation: 150,
+                    handle: 'li',
+                    ghostClass: 'sortable-ghost',
+                    onEnd: function (evt) {
+                        // Reorder state array based on DOM order
+                        const newOrderIds = Array.from(DOM.fileList.children).map(li => li.dataset.id);
+                        const newFilesArray = [];
+                        newOrderIds.forEach(id => {
+                            const file = state.files.find(f => f.id === id);
+                            if(file) newFilesArray.push(file);
+                        });
+                        state.files = newFilesArray;
+                        
+                        // Add notification about manual reorder
+                        addNotification("Orden manual aplicado. Los lotes se recalcularon basados en el nuevo orden.", "info");
+                        updateStateAndUI();
+                    }
+                });
+            }
+
+            // Batches List
+            DOM.batchesContainer.innerHTML = '';
+            if (state.batches.length === 0) {
+                DOM.batchesContainer.innerHTML = `
+                    <div class="text-gray-500 text-center py-8 italic border-2 border-dashed border-gray-700 rounded-xl">
+                        ${state.files.length > 0 ? "No hay archivos pendientes para crear lotes." : "Agrega archivos para generar los lotes."}
+                    </div>`;
+            } else {
+                state.batches.forEach((batch, index) => {
+                    const rangeText = batch.startChap !== null ? `${batch.startChap} - ${batch.endChap}` : 'Varios/Desc.';
+                    const fileCount = batch.files.length;
+                    
+                    DOM.batchesContainer.innerHTML += `
+                        <div class="bg-gray-800 rounded-xl p-4 border border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 fade-in">
+                            <div>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="bg-manga-primary text-white text-xs font-bold px-2 py-0.5 rounded uppercase">Lote ${index + 1}</span>
+                                    <span class="font-bold text-white">Capítulos: ${rangeText}</span>
+                                </div>
+                                <div class="text-sm text-gray-400">
+                                    ${fileCount} archivo(s) • ${formatBytes(batch.size)}
+                                </div>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <span class="${batch.status === 'processed' ? 'text-manga-success' : 'text-gray-500'}">
+                                    <i class="fa-solid ${batch.status === 'processed' ? 'fa-check-circle' : 'fa-hourglass-half'}"></i> 
+                                    ${batch.status === 'processed' ? 'Generado' : 'Pendiente'}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        window.removeFile = (id) => {
+            state.files = state.files.filter(f => f.id !== id);
+            updateStateAndUI();
+        };
+
+        async function startProcessingWorkflow() {
+            if (state.batches.length === 0 || state.isProcessing) return;
+            state.isProcessing = true;
+            state.cancelRequested = false;
+            state.currentProcessIndex = 0;
+            
+            processNextBatch();
+        }
+
+        function processNextBatch() {
+            if (state.cancelRequested) {
+                finishProcessing("Proceso cancelado por el usuario.");
+                return;
+            }
+
+            if (state.currentProcessIndex >= state.batches.length) {
+                finishProcessing("¡Todos los lotes procesados con éxito!");
+                return;
+            }
+
+            const batch = state.batches[state.currentProcessIndex];
+            if (batch.status === 'processed') {
+                state.currentProcessIndex++;
+                processNextBatch(); // Skip already processed
+                return;
+            }
+
+            // Prepare default filename
+            let defaultName = `Lote ${state.currentProcessIndex + 1}`;
+            if (batch.startChap !== null) {
+                defaultName = `(${batch.startChap} - ${batch.endChap}) ${state.mangaTitleFallback}`;
+            }
+
+            // Show prompt modal
+            DOM.filenameInput.value = defaultName;
+            DOM.filenameModalDesc.textContent = `Nombrando Lote ${state.currentProcessIndex + 1} de ${state.batches.length}`;
+            DOM.filenameModal.classList.remove('hidden');
+        }
+
+        DOM.btnConfirmFilename.addEventListener('click', async () => {
+            const filename = DOM.filenameInput.value.trim() || `Lote_${state.currentProcessIndex + 1}`;
+            DOM.filenameModal.classList.add('hidden');
+            
+            await mergeBatch(state.batches[state.currentProcessIndex], filename);
+        });
+
+        DOM.btnCancelProcess.addEventListener('click', () => {
+            state.cancelRequested = true;
+            DOM.filenameModal.classList.add('hidden');
+            processNextBatch(); // Will trigger cancel logic
+        });
+
+        async function mergeBatch(batch, outputFilename) {
+            DOM.processingOverlay.classList.remove('hidden');
+            DOM.processTitle.textContent = `Procesando Lote ${state.currentProcessIndex + 1} de ${state.batches.length}`;
+            DOM.processDesc.textContent = `Creando ${outputFilename}.pdf...`;
+            updateProgress(0, 'Iniciando PDF-Lib...');
+
+            try {
+                const { PDFDocument } = PDFLib;
+                const mergedPdf = await PDFDocument.create();
+
+                const totalFiles = batch.files.length;
+                
+                for (let i = 0; i < totalFiles; i++) {
+                    if(state.cancelRequested) throw new Error("Cancelado");
+
+                    const fileData = batch.files[i];
+                    updateProgress((i / totalFiles) * 80, `Copiando: ${fileData.name}`);
+                    
+                    // Read file
+                    const arrayBuffer = await fileData.file.arrayBuffer();
+                    const pdf = await PDFDocument.load(arrayBuffer);
+                    
+                    // Copy pages
+                    const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                    copiedPages.forEach((page) => mergedPdf.addPage(page));
+                    
+                    // Allow UI to update (yield to main thread)
+                    await new Promise(r => setTimeout(r, 10)); 
+                }
+
+                updateProgress(85, 'Guardando y comprimiendo estructura...');
+                const pdfBytes = await mergedPdf.save();
+                
+                updateProgress(95, 'Preparando descarga...');
+                
+                // Trigger download
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${outputFilename}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 100);
+
+                // Update State
+                batch.status = 'processed';
+                batch.files.forEach(f => {
+                    f.status = 'processed';
+                    state.processedSize += f.size;
+                });
+                
+                addNotification(`Lote creado exitosamente: ${outputFilename}.pdf`, 'success');
+                
+                updateProgress(100, '¡Completado!');
+                await new Promise(r => setTimeout(r, 800)); // Brief pause for UX
+                
+                DOM.processingOverlay.classList.add('hidden');
+                
+                // Update UI visually and move to next
+                renderUI();
+                state.currentProcessIndex++;
+                processNextBatch();
+
+            } catch (error) {
+                console.error(error);
+                DOM.processingOverlay.classList.add('hidden');
+                if (error.message !== "Cancelado") {
+                    addNotification(`Error al procesar el lote: ${error.message}`, 'error');
+                    batch.status = 'error';
+                    renderUI();
+                    state.currentProcessIndex++;
+                    processNextBatch(); // Try next on error
+                }
+            }
+        }
+
+        function updateProgress(percent, text) {
+            DOM.progressBar.style.width = `${percent}%`;
+            DOM.processPercent.textContent = `${Math.round(percent)}%`;
+            DOM.processStatus.textContent = text;
+        }
+
+        function finishProcessing(finalMsg) {
+            state.isProcessing = false;
+            addNotification(finalMsg, 'info');
+            renderUI();
+        }
+
+        // Dropzone Events
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            DOM.dropzone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            DOM.dropzone.addEventListener(eventName, () => DOM.dropzone.classList.add('drop-active'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            DOM.dropzone.addEventListener(eventName, () => DOM.dropzone.classList.remove('drop-active'), false);
+        });
+
+        DOM.dropzone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        });
+
+        DOM.fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+            DOM.fileInput.value = ''; // Reset
+        });
+
+        DOM.maxSizeSelect.addEventListener('change', (e) => {
+            state.maxBatchSize = parseInt(e.target.value) * 1024 * 1024 * 1024;
+            DOM.maxSizeDisplay.textContent = e.target.value;
+            updateStateAndUI();
+        });
+
+        DOM.btnProcess.addEventListener('click', startProcessingWorkflow);
+
+        // Initial render
+        renderUI();
+
+    </script>
 </body>
 </html>
