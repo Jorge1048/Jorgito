@@ -1,107 +1,47 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Las Motos Más Rápidas del Mundo</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #0d0d0d;
-            color: #fff;
-            margin: 0;
-            padding: 0;
-        }
-        header {
-            background: linear-gradient(to right, #ff0000, #660000);
-            padding: 20px;
-            text-align: center;
-        }
-        header h1 {
-            margin: 0;
-            font-size: 2.5em;
-            color: #fff;
-        }
-        .container {
-            padding: 30px;
-            max-width: 1000px;
-            margin: auto;
-        }
-        .bike {
-            margin-bottom: 40px;
-            background-color: #1a1a1a;
-            padding: 20px;
-            border-radius: 10px;
-            transition: transform 0.3s;
-        }
-        .bike:hover {
-            transform: scale(1.02);
-        }
-        .bike img {
-            max-width: 100%;
-            border-radius: 10px;
-        }
-        .bike h2 {
-            margin-top: 15px;
-            font-size: 1.8em;
-            color: #ff4d4d;
-        }
-        .bike p {
-            font-size: 1.1em;
-            line-height: 1.6em;
-        }
-        footer {
-            background-color: #000;
-            text-align: center;
-            padding: 15px;
-            margin-top: 40px;
-            color: #aaa;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manga PDF Manager</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
+<header>
+  <h1>MANGA PDF MANAGER</h1>
+  <p>Todo se procesa en tu navegador. Ningún PDF sale de tu dispositivo.</p>
+</header>
+<main>
+  <label id="drop" class="card drop">
+    <input id="file" type="file" accept=".pdf,application/pdf" multiple hidden>
+    <b>📂 Seleccionar archivos PDF</b>
+    <small>o arrástralos hasta aquí</small>
+  </label>
 
-    <header>
-        <h1>Las Motos Más Rápidas del Mundo</h1>
-    </header>
-
-    <div class="container">
-
-        <div class="bike">
-            <img src="https://cdn.motor1.com/images/mgl/yMZkk/s1/fastest-motorcycle-in-the-world.jpg" alt="Dodge Tomahawk">
-            <h2>1. Dodge Tomahawk – 560 km/h</h2>
-            <p>Una bestia con motor V10 de 8.3 litros tomado de un Dodge Viper. Esta moto conceptual puede alcanzar velocidades extremas, aunque no es legal para circular en la calle.</p>
-        </div>
-
-        <div class="bike">
-            <img src="https://www.topspeed.com/static/media/image/2023/04/21/top-10-fastest-motorcycles-in-the-world-2023-2_1600x0w.jpg" alt="Kawasaki Ninja H2R">
-            <h2>2. Kawasaki Ninja H2R – 400 km/h</h2>
-            <p>Una superbike sobrealimentada que desafía los límites de la ingeniería moderna. Solo para circuitos, su diseño aerodinámico y su potencia bruta la convierten en un misil sobre ruedas.</p>
-        </div>
-
-        <div class="bike">
-            <img src="https://cdn.motorcycle.com/blog/wp-content/uploads/2022/08/080422-top-10-fastest-motorcycles-01-kawasaki-ninja-h2r.jpg" alt="MTT Turbine Superbike Y2K">
-            <h2>3. MTT Turbine Superbike Y2K – 365 km/h</h2>
-            <p>Equipada con un motor de turbina de helicóptero Rolls-Royce, esta moto es una de las más exóticas jamás creadas. Su potencia alcanza los 320 HP.</p>
-        </div>
-
-        <div class="bike">
-            <img src="https://i.ytimg.com/vi/nS0-H4U2V0g/maxresdefault.jpg" alt="Suzuki Hayabusa">
-            <h2>4. Suzuki Hayabusa – 312 km/h</h2>
-            <p>Un clásico de las superbikes. La Hayabusa combina velocidad con estabilidad y confort. Fue la moto de producción más rápida durante muchos años.</p>
-        </div>
-
-        <div class="bike">
-            <img src="https://imgd.aeplcdn.com/600x337/n/cw/ec/45299/bmw-s-1000-rr-right-side-view.jpeg" alt="BMW S1000RR">
-            <h2>5. BMW S1000RR – 303 km/h</h2>
-            <p>Esta máquina alemana de alto rendimiento está diseñada tanto para el circuito como para la carretera. Precisión, potencia y electrónica de punta la definen.</p>
-        </div>
-
+  <section id="app" hidden>
+    <div class="card"><div class="stats" id="stats"></div></div>
+    <div class="card row">
+      <label>Tamaño máximo por archivo (GB)
+        <input id="max" type="number" min="0.1" step="0.1" value="2"></label>
+      <button id="go" class="primary">📚 CREAR PDFs</button>
+      <button id="clear">Limpiar</button>
     </div>
+    <div class="card" id="prog" hidden></div>
+    <div class="card"><h2>🔔 Notificaciones</h2><ul id="notes"></ul></div>
+    <div class="card"><h2>Lotes pendientes</h2><div id="batches"></div></div>
+    <div class="card"><h2>Archivos</h2><ul id="files"></ul></div>
+  </section>
+</main>
 
-    <footer>
-        Página creada por un amante de la velocidad 🏍️ | &copy; 2025
-    </footer>
+<dialog id="dlg">
+  <h3>Nombre del archivo</h3>
+  <input id="nm" aria-label="Nombre del archivo">
+  <p id="dinfo"></p>
+  <button id="dl" class="primary">⬇️ Descargar</button>
+</dialog>
 
+<!-- pdf-lib: única petición externa (solo descarga la librería; los PDFs nunca se envían) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
