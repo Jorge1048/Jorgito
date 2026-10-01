@@ -1,659 +1,350 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manga PDF Manager</title>
-    <!-- Tailwind CSS para el diseño -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- pdf-lib para unir PDFs localmente -->
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-    <!-- SortableJS para arrastrar y reordenar -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-    
-    <!-- ESTILOS CSS INCORPORADOS -->
-    <style>
-        /* Custom Scrollbar dedicado para la lista de archivos */
-        .custom-scroll-container {
-            max-height: 420px;
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: #ff3355 #0c0e14;
-        }
-
-        .custom-scroll-container::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .custom-scroll-container::-webkit-scrollbar-track {
-            background: #0c0e14;
-            border-radius: 8px;
-        }
-
-        .custom-scroll-container::-webkit-scrollbar-thumb {
-            background: #ff3355;
-            border-radius: 8px;
-        }
-
-        .custom-scroll-container::-webkit-scrollbar-thumb:hover {
-            background: #8b5cf6;
-        }
-
-        /* Animaciones suaves */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(6px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .animate-fade-in {
-            animation: fadeIn 0.25s ease-out forwards;
-        }
-
-        /* Estilos de arrastre con SortableJS */
-        .sortable-ghost {
-            opacity: 0.3;
-            border: 2px border-dashed #ff3355 !important;
-        }
-
-        .sortable-drag {
-            cursor: grabbing;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manga PDF Manager</title>
+<style>
+:root{--bg:#0c0e14;--card:#161922;--in:#10121a;--line:#2a2d38;--tx:#ececf1;--mut:#9094a3;--red:#ff3355;--vio:#8b5cf6;--ok:#34d399;--warn:#f5b942}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,Segoe UI,sans-serif}
+header{padding:22px 14px 6px;text-align:center}
+h1{margin:0;font:900 clamp(1.7rem,7vw,2.8rem) Impact,"Arial Black",sans-serif;letter-spacing:.04em;background:linear-gradient(90deg,#fff,var(--red) 60%,var(--vio));-webkit-background-clip:text;background-clip:text;color:transparent}
+header p{margin:.4rem 0 0;color:var(--mut);font-size:.85rem}
+main,#app{display:grid;gap:14px}
+main{max-width:920px;margin:auto;padding:12px 14px 70px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.card h2{margin:0 0 8px;font-size:1.02rem}
+.drop{display:grid;place-items:center;gap:4px;min-height:150px;text-align:center;cursor:pointer;border:2px dashed var(--line);font-size:1.15rem}
+.drop:hover,.drop.over{border-color:var(--red)}
+.drop small,.hint{color:var(--mut);font-size:.85rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.stats div{background:var(--in);border-radius:10px;padding:9px 11px}
+.stats span{display:block;color:var(--mut);font-size:.75rem}
+.stats b{font-size:1rem;word-break:break-word}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.row label{flex:1 1 220px;color:var(--mut);font-size:.88rem}
+select,input{width:100%;background:var(--in);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit}
+button{background:#262935;color:var(--tx);border:0;border-radius:10px;padding:10px 14px;font:inherit;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+.primary{background:linear-gradient(90deg,var(--red),var(--vio));font-weight:700}
+.wide{width:100%;padding:14px;font-size:1.05rem}
+ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+li{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--in);border-radius:10px;padding:10px;border-left:4px solid var(--line)}
+li.pending{border-color:var(--mut)}li.done{border-color:var(--ok)}li.warn{border-color:var(--warn)}li.error{border-color:var(--red)}li.off{opacity:.5}
+#files li{cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#files .sortable-ghost{opacity:.35;outline:2px dashed var(--red)}
+li .info{flex:1 1 220px;min-width:0;word-break:break-word}
+li small{display:block;color:var(--mut)}
+li button{padding:6px 10px;font-size:.82rem}
+.bar{height:12px;background:var(--in);border-radius:6px;overflow:hidden;margin:8px 0}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--red),var(--vio));transition:width .2s}
+.alert{border-color:var(--warn);background:#2a2412}
+dialog{background:var(--card);color:var(--tx);border:1px solid var(--red);border-radius:14px;width:min(92vw,460px);padding:18px}
+dialog::backdrop{background:#000b}
+dialog .row button{flex:1}
+</style>
 </head>
-<body class="bg-[#0c0e14] text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-[#ff3355] selection:text-white">
+<body>
+<header>
+  <h1>MANGA PDF MANAGER</h1>
+  <p>🔒 100% local: tus PDFs nunca salen de este dispositivo</p>
+</header>
+<main>
+  <div id="crash" class="card alert" hidden></div>
+  <label id="drop" class="card drop">
+    <input id="file" type="file" accept="application/pdf,.pdf" multiple hidden>
+    <b>📂 Seleccionar archivos PDF</b><small>o arrástralos hasta aquí</small>
+  </label>
 
-    <!-- Header -->
-    <header class="border-b border-slate-800/80 bg-[#12151e]/80 backdrop-blur-md sticky top-0 z-40">
-        <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#ff3355] to-[#8b5cf6] flex items-center justify-center text-white font-black text-xl shadow-lg shadow-[#ff3355]/20">
-                    M
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold tracking-wider bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                        MANGA PDF MANAGER
-                    </h1>
-                    <p class="text-xs text-slate-400 flex items-center gap-1">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        100% Procesamiento Local — Sin Servidor
-                    </p>
-                </div>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="flex-grow max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
-
-        <!-- Zona de Carga / Drag & Drop -->
-        <!-- NOTA: Añadido onclick directo para que iOS no falle al tocar la tarjeta -->
-        <section id="drop-zone" onclick="document.getElementById('file-input').click()" class="border-2 border-dashed border-slate-700/80 hover:border-[#ff3355] bg-[#161922]/60 hover:bg-[#161922] rounded-2xl p-8 text-center transition-all cursor-pointer relative overflow-hidden group shadow-xl">
-            <!-- NOTA: El accept ahora es más permisivo para los iPhone -->
-            <input type="file" id="file-input" multiple accept="application/pdf,.pdf" class="hidden">
-            <div class="relative z-10 space-y-3 pointer-events-none">
-                <div class="w-16 h-16 mx-auto rounded-2xl bg-slate-800/80 border border-slate-700/50 flex items-center justify-center text-3xl group-hover:scale-110 group-hover:border-[#ff3355]/50 transition-all duration-300">
-                    📂
-                </div>
-                <div>
-                    <p class="text-lg font-semibold text-slate-200">Seleccionar o arrastrar archivos PDF</p>
-                    <p class="text-sm text-slate-400 mt-1">Si estás en iPhone, prueba seleccionando de 2 a 3 archivos a la vez.</p>
-                </div>
-                <div class="inline-flex items-center gap-2 bg-gradient-to-r from-[#ff3355] to-[#e62e4d] text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-[#ff3355]/25">
-                    <span>Examinar dispositivo</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- Contenedor Principal Dashboard (Oculto hasta cargar archivos) -->
-        <div id="dashboard" class="hidden space-y-6">
-
-            <!-- Panel de Estadísticas / Resumen -->
-            <section class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
-                <div class="bg-[#161922] border border-slate-800/80 rounded-xl p-3.5">
-                    <p class="text-xs text-slate-400 font-medium">Archivos</p>
-                    <p id="stat-files" class="text-lg font-bold text-slate-100 mt-1">0</p>
-                </div>
-                <div class="bg-[#161922] border border-slate-800/80 rounded-xl p-3.5">
-                    <p class="text-xs text-slate-400 font-medium">Tamaño Total</p>
-                    <p id="stat-size" class="text-lg font-bold text-slate-100 mt-1">0 MB</p>
-                </div>
-                <div class="bg-[#161922] border border-slate-800/80 rounded-xl p-3.5 col-span-2 sm:col-span-2">
-                    <p class="text-xs text-slate-400 font-medium">Capítulos Detectados</p>
-                    <p id="stat-chapters" class="text-lg font-bold text-[#8b5cf6] mt-1">-</p>
-                </div>
-                <div class="bg-[#161922] border border-slate-800/80 rounded-xl p-3.5">
-                    <p class="text-xs text-slate-400 font-medium">Manga</p>
-                    <p id="stat-manga" class="text-base font-bold text-slate-100 truncate mt-1">-</p>
-                </div>
-                <div class="bg-[#161922] border border-slate-800/80 rounded-xl p-3.5">
-                    <p class="text-xs text-slate-400 font-medium">Advertencias</p>
-                    <p id="stat-issues" class="text-lg font-bold text-amber-400 mt-1">0</p>
-                </div>
-                <div class="bg-[#161922] border border-slate-800/80 rounded-xl p-3.5">
-                    <p class="text-xs text-slate-400 font-medium">Lotes Proyectados</p>
-                    <p id="stat-batches" class="text-lg font-bold text-emerald-400 mt-1">0</p>
-                </div>
-            </section>
-
-            <!-- Sección de Notificaciones y Advertencias -->
-            <section id="notifications-section" class="hidden space-y-2">
-                <h3 class="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                    <span>🔔</span> Notificaciones del Análisis
-                </h3>
-                <div id="notifications-list" class="space-y-2"></div>
-            </section>
-
-            <!-- Lista de Archivos Cargados (Con Scrollbar Independiente) -->
-            <section class="bg-[#161922] border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-xl">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 class="text-base font-bold text-slate-100">Archivos para Organizar</h2>
-                        <p class="text-xs text-slate-400">Mantén presionado o arrastra las tres rayas (☰) para reordenar</p>
-                    </div>
-                    <button type="button" id="clear-btn" class="text-xs text-slate-400 hover:text-red-400 transition px-2.5 py-1 rounded-lg border border-slate-800 hover:border-red-900/50">
-                        🗑️ Limpiar lista
-                    </button>
-                </div>
-
-                <!-- ÁREA DE SCROLL CON CANAL LATERAL DEDICADO -->
-                <div class="custom-scroll-container pr-3">
-                    <ul id="file-list" class="space-y-2.5"></ul>
-                </div>
-            </section>
-
-            <!-- Panel de Configuración y Procesamiento -->
-            <section class="bg-[#161922] border border-slate-800/80 rounded-2xl p-5 shadow-xl space-y-5">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                    <div>
-                        <h3 class="font-bold text-slate-200">Creación Automática de Lotes</h3>
-                        <p class="text-xs text-slate-400">Agrupa inteligentemente respetando el orden numérico</p>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <label for="max-size-select" class="text-xs font-medium text-slate-300">Tamaño máx. por lote:</label>
-                        <select id="max-size-select" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#ff3355]">
-                            <option value="2000">2 GB (Recomendado)</option>
-                            <option value="1500">1.5 GB</option>
-                            <option value="1000">1 GB</option>
-                            <option value="500">500 MB</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Barra de Progreso Global -->
-                <div id="progress-container" class="hidden space-y-2 bg-slate-900/60 border border-slate-800/80 p-4 rounded-xl">
-                    <div class="flex justify-between text-xs font-semibold">
-                        <span id="progress-status-text" class="text-[#8b5cf6]">Procesando Lote 1...</span>
-                        <span id="progress-percentage" class="text-slate-300">0%</span>
-                    </div>
-                    <div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden p-0.5">
-                        <div id="progress-bar" class="bg-gradient-to-r from-[#ff3355] to-[#8b5cf6] h-full rounded-full transition-all duration-300 w-0"></div>
-                    </div>
-                    <p id="progress-detail" class="text-xs text-slate-400 text-center">Uniendo páginas del PDF localmente...</p>
-                </div>
-
-                <!-- Botón Principal -->
-                <button type="button" id="process-btn" class="w-full py-3.5 bg-gradient-to-r from-[#ff3355] via-[#e62e4d] to-[#8b5cf6] hover:opacity-95 text-white font-bold rounded-xl shadow-lg shadow-[#ff3355]/20 flex items-center justify-center gap-2 transition duration-200 text-base">
-                    <span>📚</span>
-                    <span>CREAR PDFs UNIFICADOS</span>
-                </button>
-            </section>
-        </div>
-    </main>
-
-    <!-- Modal para Confirmación de Descarga -->
-    <div id="download-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-[#161922] border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-xl">
-                    ✅
-                </div>
-                <div>
-                    <h3 class="font-bold text-slate-100">¡Lote Procesado con Éxito!</h3>
-                    <p class="text-xs text-slate-400">Revisa o edita el nombre antes de descargar</p>
-                </div>
-            </div>
-
-            <div class="space-y-2">
-                <label for="download-filename-input" class="text-xs font-semibold text-slate-300">Nombre final del archivo:</label>
-                <div class="flex items-center gap-2">
-                    <input type="text" id="download-filename-input" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-[#ff3355]">
-                    <span class="text-xs font-bold text-slate-500">.pdf</span>
-                </div>
-            </div>
-
-            <div class="flex gap-3 pt-2">
-                <button type="button" id="skip-download-btn" class="flex-1 py-2.5 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl transition">
-                    Omitir
-                </button>
-                <button type="button" id="confirm-download-btn" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-1.5">
-                    <span>📥</span>
-                    <span>Descargar PDF</span>
-                </button>
-            </div>
-        </div>
+  <section id="app" hidden>
+    <div class="card"><div class="stats" id="stats"></div></div>
+    <div class="card">
+      <div class="row">
+        <label>Tamaño máximo por archivo<select id="max"></select></label>
+        <button id="auto" hidden>↕ Orden automático</button>
+        <button id="clear">🗑️ Limpiar</button>
+      </div>
+      <p class="hint" id="memHint"></p>
+      <button id="go" class="primary wide">📚 CREAR PDFs</button>
     </div>
+    <div class="card" id="prog" hidden></div>
+    <div class="card"><h2>🔔 Notificaciones</h2><ul id="notes"></ul></div>
+    <div class="card"><h2>Lotes</h2><ul id="batches"></ul></div>
+    <div class="card"><h2>Archivos</h2><p class="hint">Mantén presionado un archivo y arrástralo para cambiar su posición.</p><ul id="files"></ul></div>
+  </section>
+</main>
 
-    <!-- LOGICA JAVASCRIPT INCORPORADA -->
-    <script>
-        // --- ESTADO GLOBAL DE LA APLICACIÓN ---
-        const state = {
-            files: [],
-            mangaTitleFallback: "Manga",
-            totalSize: 0,
-            notifications: [],
-            batches: [],
-            isProcessing: false
-        };
+<dialog id="dlg">
+  <h3 style="margin:0 0 4px">✅ Lote listo</h3>
+  <p class="hint" id="dinfo"></p>
+  <input id="nm" aria-label="Nombre del archivo">
+  <div class="row" style="margin-top:12px"><button id="skip">Omitir</button><button id="dl" class="primary">📥 Descargar PDF</button></div>
+</dialog>
 
-        // --- ELEMENTOS DOM ---
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        const dashboard = document.getElementById('dashboard');
-        const fileList = document.getElementById('file-list');
-        const notificationsList = document.getElementById('notifications-list');
-        const notificationsSection = document.getElementById('notifications-section');
-        const processBtn = document.getElementById('process-btn');
-        const clearBtn = document.getElementById('clear-btn');
-        const maxSizeSelect = document.getElementById('max-size-select');
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<script>
+'use strict';
+/* Manga PDF Manager — todo ocurre en el navegador; los PDFs no se suben a ningún sitio. */
+const $ = s => document.querySelector(s), MB = 1048576, GB = 1024 * MB;
+const S = { items: [], events: [], warn: [], manga: 'Manga', running: false, manual: false, doneBatches: [] };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = b => b >= GB ? (b / GB).toFixed(2) + ' GB' : (b / MB).toFixed(0) + ' MB';
+const rng = (a, b) => a === b ? `${a}` : `${a}-${b}`;
+const tick = () => new Promise(r => setTimeout(r, 30)); // cede el hilo: deja respirar al recolector de memoria
+const ls = { // localStorage a prueba de fallos (modo privado, etc.)
+  get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} },
+  del: k => { try { localStorage.removeItem(k); } catch (_) {} } };
+const doneSet = new Set(JSON.parse(ls.get('mpm_done') || '[]')); // archivos ya procesados (sobrevive a recargas)
+const keyOf = f => `${f.name}|${f.size}|${f.lastModified}`;
 
-        // Modal Elements
-        const downloadModal = document.getElementById('download-modal');
-        const downloadFilenameInput = document.getElementById('download-filename-input');
-        const confirmDownloadBtn = document.getElementById('confirm-download-btn');
-        const skipDownloadBtn = document.getElementById('skip-download-btn');
+/* ---------- Memoria: tamaño de lote seguro ----------
+   pdf-lib mantiene en RAM los PDFs de origen + el PDF final (+ una copia al descargar).
+   Pico real ≈ 2–3× el tamaño del lote. Por eso se sugiere un tamaño según el dispositivo. */
+const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const safeMB = Math.max(250, Math.min(2000, (navigator.deviceMemory || 4) * 1024 * (mobile ? .5 : 1) / 6));
+const SIZES = [250, 500, 1000, 1500, 2000];
+const sel = $('#max');
+sel.innerHTML = SIZES.map(v => `<option value="${v}">${v >= 1000 ? v / 1000 + ' GB' : v + ' MB'}</option>`).join('');
+const pick = mb => SIZES.filter(v => v <= mb).pop() || 250;
+sel.value = pick(safeMB);
+const limit = () => +sel.value * MB;
 
-        // --- EVENT LISTENERS DE ARRASTRE Y SELECCIÓN ---
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('border-[#ff3355]', 'bg-[#161922]');
-        });
+/* Detección de cierre por falta de memoria: si al abrir queda la marca de "procesando", la pestaña murió. */
+const crashed = ls.get('mpm_run');
+if (crashed) {
+  ls.del('mpm_run');
+  try {
+    const r = JSON.parse(crashed), nuevo = pick(Math.min(+r.lim, r.mb) / 2);
+    sel.value = nuevo;
+    $('#crash').hidden = false;
+    $('#crash').innerHTML = `⚠️ La página se cerró al crear el lote ${r.n} (~${r.mb} MB), casi seguro por falta de memoria. Bajé el tamaño máximo a ${nuevo} MB. Vuelve a seleccionar los archivos: los lotes ya guardados aparecerán como procesados.`;
+  } catch (_) {}
+}
 
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('border-[#ff3355]', 'bg-[#161922]');
-        });
+/* ---------- 1. Interpretar nombres ---------- */
+function parse(fn) {
+  let s = fn.replace(/\.pdf$/i, '').replace(/_/g, ' '), copy = false;
+  const c = s.match(/^(.*\S)\s+\((\d{1,2})\)\s*$/); // sufijo de copia "(1)"
+  if (c && /\d/.test(c[1])) { s = c[1]; copy = true; }
+  const bad = { name: '', copy, start: null };
+  let m = s.match(/(\d+(?:\.\d+)?)\s*[-–—~]\s*(\d+(?:\.\d+)?)/), a, b;
+  if (m) { a = +m[1]; b = +m[2]; }
+  else {
+    m = s.match(/(\d+(?:\.\d+)?)(?=\)?\s*$)/); // número simple al final
+    if (!m || /\b(especial|special|extra|omake|oneshot)\b/i.test(s)) return bad;
+    a = b = +m[1];
+  }
+  if (b < a) return bad;
+  const name = s.slice(0, m.index)
+    .replace(/\b(caps?|cap[ií]tulos?|chapters?|ch|vol(umen|umenes)?|tomo|c)\b\.?/gi, '')
+    .replace(/[()\[\]]/g, ' ').replace(/^[\s\-–—:]+|[\s\-–—:]+$/g, '').replace(/\s+/g, ' ');
+  return { name, copy, start: a, end: b };
+}
 
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('border-[#ff3355]', 'bg-[#161922]');
-            if (e.dataTransfer.files.length > 0) {
-                handleFilesSelected(Array.from(e.dataTransfer.files));
-            }
-        });
+function addFiles(list) {
+  for (const f of list) {
+    if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') continue;
+    if (S.items.some(i => keyOf(i.file) === keyOf(f))) continue;
+    const p = parse(f.name);
+    S.items.push({ file: f, size: f.size, ...p, parsed: p.start !== null, status: doneSet.has(keyOf(f)) ? 'done' : 'pending', keep: null, err: '' });
+  }
+  $('#app').hidden = !S.items.length;
+  render();
+}
 
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files.length > 0) {
-                handleFilesSelected(Array.from(e.target.files));
-                // Limpiar el input para permitir volver a cargar los mismos si hace falta
-                fileInput.value = '';
-            }
-        });
+/* ---------- 2. Análisis ---------- */
+const active = i => i.parsed && !i.excluded && i.status !== 'error';
+function analyze() {
+  const it = S.items, lim = limit();
+  if (!S.manual) it.sort((x, y) => (x.parsed === y.parsed ? 0 : x.parsed ? -1 : 1) || x.start - y.start || x.end - y.end || x.file.name.localeCompare(y.file.name, undefined, { numeric: true }));
+  const cnt = {};
+  it.forEach(i => { if (i.name) { const k = i.name.toLowerCase(); (cnt[k] = cnt[k] || { n: 0, name: i.name }).n++; } });
+  const top = Object.values(cnt).sort((a, b) => b.n - a.n)[0];
+  S.manga = top ? top.name : 'Manga';
 
-        clearBtn.addEventListener('click', () => {
-            state.files = [];
-            state.batches = [];
-            state.notifications = [];
-            render();
-            dashboard.classList.add('hidden');
-        });
+  const groups = {}; S.warn = [];
+  it.forEach(i => { i.dupKey = null; i.excluded = false; if (i.parsed) (groups[rng(i.start, i.end)] ||= []).push(i); });
+  for (const [k, g] of Object.entries(groups)) {
+    if (g.length < 2) continue;
+    if (!g.some(i => i.keep)) { g.forEach(i => i.keep = false); [...g].sort((a, b) => a.copy - b.copy)[0].keep = true; }
+    g.forEach(i => { i.dupKey = k; i.excluded = !i.keep; });
+    S.warn.push(`⚠️ Posible duplicado: capítulos ${k} (${g.length} archivos). Elige cuál conservar.`);
+  }
+  it.filter(i => !i.parsed).forEach(i => S.warn.push(`⚠️ No se pudo determinar el rango de este archivo: ${i.file.name}`));
+  it.filter(i => i.size > lim && i.status !== 'done').forEach(i => S.warn.push(`⚠️ ${i.file.name} pesa ${fmt(i.size)} y supera el máximo: no se procesará como lote normal.`));
+  it.filter(i => i.status === 'error').forEach(i => S.warn.push(`❌ Error en ${i.file.name}: ${i.err}`));
 
-        // Inicializar SortableJS para arrastrar archivos
-        new Sortable(fileList, {
-            animation: 150,
-            handle: '.drag-handle',
-            onEnd: function () {
-                const newOrder = [];
-                const items = fileList.querySelectorAll('li');
-                items.forEach(item => {
-                    const id = item.dataset.id;
-                    const fileObj = state.files.find(f => f.id === id);
-                    if (fileObj) newOrder.push(fileObj);
-                });
-                state.files = newOrder;
-                analyzeFiles(state.files);
-                updateStatsUI();
-            }
-        });
+  S.missing = 0; let maxEnd = null;
+  [...it].filter(i => i.parsed && !i.excluded).sort((x, y) => x.start - y.start || x.end - y.end).forEach(i => {
+    if (maxEnd !== null && Math.ceil(i.start) - Math.floor(maxEnd) > 1) {
+      const a = Math.floor(maxEnd) + 1, b = Math.ceil(i.start) - 1; S.missing += b - a + 1;
+      S.warn.push(`⚠️ Posible capítulo faltante: ${rng(a, b)}.` + (it.some(x => !x.parsed) ? ' Podría estar en un archivo no reconocido.' : ''));
+    }
+    maxEnd = maxEnd === null ? i.end : Math.max(maxEnd, i.end);
+  });
+}
 
-        // --- MANEJO Y LECTURA DE ARCHIVOS ---
-        function handleFilesSelected(newRawFiles) {
-            // Filtro tolerante para iPhone/iOS
-            const pdfFiles = newRawFiles.filter(f => {
-                const name = f.name.toLowerCase();
-                return name.endsWith('.pdf') || f.type === 'application/pdf' || f.type === '';
-            });
-            
-            if (pdfFiles.length === 0) {
-                alert("No se detectaron archivos PDF válidos. Intenta nuevamente.");
-                return;
-            }
+/* ---------- 3. Lotes: en orden, sin pasar el máximo ---------- */
+function batches() {
+  const lim = limit(), out = []; let cur = null;
+  for (const f of S.items.filter(i => active(i) && i.status === 'pending' && i.size <= lim)) {
+    if (!cur || cur.size + f.size > lim) out.push(cur = { files: [], size: 0 });
+    cur.files.push(f); cur.size += f.size;
+  }
+  out.forEach(b => { b.min = Math.min(...b.files.map(f => f.start)); b.max = Math.max(...b.files.map(f => f.end)); });
+  return out;
+}
 
-            const processedFiles = pdfFiles.map(file => {
-                const parsed = parseFilename(file.name);
-                return {
-                    id: Math.random().toString(36).substring(2, 9),
-                    file: file,
-                    name: file.name,
-                    size: file.size,
-                    mangaName: parsed.mangaName,
-                    start: parsed.start,
-                    end: parsed.end,
-                    isRecognized: parsed.isRecognized,
-                    status: 'pending'
-                };
-            });
+/* ---------- 4. Pantalla ---------- */
+function render() {
+  analyze();
+  const it = S.items, sum = fn => it.filter(fn).reduce((n, i) => n + i.size, 0), bs = batches();
+  const ps = it.filter(i => i.parsed), errs = it.filter(i => i.status === 'error').length;
+  const st = [['📚 Manga', S.manga], ['📄 Archivos', it.length], ['📖 Capítulos', ps.length ? rng(Math.min(...ps.map(i => i.start)), Math.max(...ps.map(i => i.end))) : '—'],
+    ['💾 Tamaño total', fmt(sum(() => true))], ['✅ Procesados', fmt(sum(i => i.status === 'done'))], ['⏳ Pendientes', fmt(bs.reduce((n, b) => n + b.size, 0))],
+    ['⚠️ Advertencias', S.warn.length - errs], ['❌ Errores', errs], ['Faltantes', S.missing], ['Lotes pendientes', bs.length]];
+  $('#stats').innerHTML = st.map(([k, v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('');
 
-            state.files = [...state.files, ...processedFiles];
-            analyzeFiles(state.files);
-            render();
-            dashboard.classList.remove('hidden');
-        }
+  const ev = [...S.warn.map(t => ({ t })), ...S.events.map(e => ({ t: `${e.i} ${e.t}`, time: e.time }))];
+  $('#notes').innerHTML = ev.map(e => `<li class="${e.t.startsWith('❌') ? 'error' : e.t.startsWith('⚠️') ? 'warn' : 'done'}"><span class="info">${esc(e.t)}</span><small>${e.time || ''}</small></li>`).join('') || '<li>Sin notificaciones.</li>';
 
-        // --- PARSER SÚPER INTELIGENTE (Detecta S-N-K-vol1) ---
-        function parseFilename(filename) {
-            const nameWithoutExt = filename.replace(/\.pdf$/i, '').trim();
-            let mangaName = '';
-            let start = null;
-            let end = null;
-            let isRecognized = false;
+  $('#batches').innerHTML = S.doneBatches.map(d => `<li class="done"><span class="info"><b>✅ ${esc(d.name)}</b><small>Capítulos ${d.r} · ${fmt(d.size)}</small></span></li>`).join('') +
+    bs.map((b, n) => `<li class="pending"><span class="info"><b>⏳ Lote ${n + 1}</b><small>Capítulos ${rng(b.min, b.max)} · ${fmt(b.size)} · ${b.files.length} archivos</small></span></li>`).join('') || '<li>No hay lotes pendientes.</li>';
 
-            // Normalización para tratar los nombres locos
-            const normalized = nameWithoutExt.replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  $('#files').innerHTML = it.map((i, n) => {
+    const big = i.size > limit() && i.status !== 'done';
+    const cls = i.status === 'done' ? 'done' : i.status === 'error' ? 'error' : (!i.parsed || i.dupKey || big) ? 'warn' : 'pending';
+    const tx = i.status === 'done' ? 'Procesado' : i.status === 'error' ? 'Error: ' + i.err : !i.parsed ? 'Rango no reconocido' : i.excluded ? 'Duplicado omitido' : i.dupKey ? 'Duplicado (conservado)' : big ? 'Demasiado grande' : 'Pendiente';
+    return `<li data-n="${n}" class="${cls} ${i.excluded ? 'off' : ''}"><span class="info"><b>${{ done: '✅', error: '❌', warn: '⚠️', pending: '⏳' }[cls]} ${esc(i.file.name)}</b><small>${fmt(i.size)} · Cap. ${i.parsed ? rng(i.start, i.end) : '?'} · ${esc(tx)}</small></span>
+      <span>${!i.parsed ? `<button data-a="set">Asignar capítulos</button> ` : ''}${i.dupKey && !i.keep ? `<button data-a="keep">Conservar este</button> ` : ''}<button data-a="rm" aria-label="Quitar">✕</button></span></li>`;
+  }).join('');
 
-            // 1. Buscamos el formato "S-N-K-vol1" o "S-N-K cap 1"
-            const singleRegex = /^(.*?)[-\s_]*(?:cap(?:ítulo|itulo)?s?|chapter|ch|vol(?:umen)?|vol\.?)[-\s_]*[\(\[]?\s*(\d+(?:\.\d+)?)\s*[\)\]]?\s*$/i;
-            let match = normalized.match(singleRegex);
-            
-            if (match) {
-                mangaName = match[1].trim();
-                start = parseFloat(match[2]);
-                end = start;
-                isRecognized = true;
-            }
+  $('#memHint').innerHTML = (+sel.value > safeMB ? '⚠️ ' : '💡 ') + `Tamaño seguro estimado para este equipo: ~${Math.round(safeMB)} MB. Armar un PDF consume 2–3 veces su peso en memoria` + (+sel.value > safeMB ? '; con este valor la pestaña podría cerrarse.' : '.');
+  $('#auto').hidden = !S.manual;
+  $('#go').disabled = S.running || !bs.length;
+}
+const note = (i, t) => { S.events.unshift({ i, t, time: new Date().toLocaleTimeString() }); render(); };
 
-            // 2. Buscamos rangos (Ej: Naruto vol 01-17)
-            if (!match) {
-                const rangeRegex = /^(.*?)\s*(?:cap(?:ítulo|itulo)?s?|chapter|chapters|ch|vol(?:umen)?|vol\.?)?\s*[\(\[]?\s*(\d+(?:\.\d+)?)\s*(?:-|–|—|al|a|to)\s*(\d+(?:\.\d+)?)\s*[\)\]]?\s*$/i;
-                match = normalized.match(rangeRegex);
-                if (match) {
-                    mangaName = match[1].trim();
-                    start = parseFloat(match[2]);
-                    end = parseFloat(match[3]);
-                    isRecognized = true;
-                }
-            }
+/* ---------- 5. Nombre y guardado ---------- */
+function askName(def, size) {
+  return new Promise(res => {
+    const d = $('#dlg'); $('#nm').value = def; $('#dinfo').textContent = `Tamaño: ${fmt(size)}. Edita el nombre si quieres.`;
+    const done = v => { d.close(); res(v); };
+    $('#dl').onclick = () => done(($('#nm').value.trim() || def).replace(/[\\/:*?"<>|]/g, '').replace(/\.pdf$/i, ''));
+    $('#skip').onclick = () => done(null);
+    d.oncancel = e => e.preventDefault();
+    d.showModal();
+  });
+}
+/* Devuelve true si se guardó, false si el usuario canceló. Se llama justo tras el clic (necesita gesto del usuario). */
+async function saveFile(bytes, name) {
+  const fileName = name + '.pdf';
+  // 1) Chrome/Edge de escritorio: escribe directo a disco por trozos, sin crear un Blob (no duplica la RAM)
+  if (window.showSaveFilePicker) {
+    try {
+      const h = await showSaveFilePicker({ suggestedName: fileName, types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }] });
+      const w = await h.createWritable();
+      for (let o = 0; o < bytes.length; o += 32 * MB) await w.write(bytes.subarray(o, o + 32 * MB));
+      await w.close(); return true;
+    } catch (e) { if (e.name === 'AbortError') return false; console.warn(e); }
+  }
+  // 2) Resto de navegadores: Blob. En iPhone/iPad se usa Compartir → Guardar en Archivos.
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const file = new File([blob], fileName, { type: 'application/pdf' });
+  if (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); return true; } catch (e) { if (e.name === 'AbortError') return false; }
+    }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fileName;
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 300000);
+  return true;
+}
 
-            // Limpiar "Manga Name" de guiones sueltos que hayan sobrado (ej. de S-N-K- a S-N-K)
-            mangaName = mangaName.replace(/[\(\)\[\]]/g, '').replace(/[-–—_:\s]+$/g, '').trim();
+/* ---------- 6. Procesar lotes (uno a uno, liberando memoria) ---------- */
+async function run() {
+  if (S.running) return;
+  if (typeof PDFLib === 'undefined') return note('❌', 'No se cargó la librería pdf-lib (¿sin internet?). Recarga la página.');
+  const bs = batches(); if (!bs.length) return;
+  S.running = true; render(); $('#prog').hidden = false;
+  let wl = null, aborted = false;
+  try { wl = await navigator.wakeLock?.request('screen'); } catch (_) {} // evita que el móvil se duerma
+  for (let n = 0; n < bs.length && !aborted; n++) {
+    const b = bs[n]; let cur = null;
+    try {
+      ls.set('mpm_run', JSON.stringify({ n: n + 1, mb: Math.round(b.size / MB), lim: +sel.value })); // marca anti-cierre
+      let out = await PDFLib.PDFDocument.create(), read = 0;
+      for (const f of b.files) {
+        cur = f; const pct = Math.round(read / b.size * 100);
+        $('#prog').innerHTML = `<h2>Procesando lote ${n + 1} de ${bs.length}</h2><div>${esc(S.manga)} ${rng(b.min, b.max)}</div><div class="bar"><i style="width:${pct}%"></i></div><small class="hint">${pct}% · ${esc(f.file.name)}</small>`;
+        await tick();
+        let buf = await f.file.arrayBuffer(), src = await PDFLib.PDFDocument.load(buf, { ignoreEncryption: true, updateMetadata: false });
+        (await out.copyPages(src, src.getPageIndices())).forEach(p => out.addPage(p));
+        buf = src = null; read += f.size; // se suelta la referencia del origen
+      }
+      cur = null;
+      $('#prog').innerHTML = `<h2>Lote ${n + 1} de ${bs.length}: guardando…</h2><div class="bar"><i style="width:100%"></i></div>`;
+      await tick();
+      let bytes = await out.save({ addDefaultPage: false }); out = null; // el documento se suelta antes de pedir el nombre
+      if (!bytes.length) throw new Error('el PDF generado está vacío');
+      const size = bytes.length, name = await askName(`(${b.min} - ${b.max}) ${S.manga}`, size);
+      const ok = name ? await saveFile(bytes, name) : false;
+      bytes = null;
+      if (!name) note('⚠️', `Lote ${n + 1} omitido: sigue pendiente.`);
+      else if (!ok) { aborted = true; note('⚠️', 'Descarga cancelada: el lote sigue pendiente.'); }
+      else {
+        b.files.forEach(f => { f.status = 'done'; doneSet.add(keyOf(f.file)); });
+        ls.set('mpm_done', JSON.stringify([...doneSet]));
+        S.doneBatches.push({ name: name + '.pdf', r: rng(b.min, b.max), size });
+        note('🔔', `Lote terminado: se creó correctamente ${name}.pdf`);
+      }
+    } catch (e) {
+      if (cur) { cur.status = 'error'; cur.err = e.message || 'no se pudo leer'; }
+      note('❌', `Lote ${n + 1} falló${cur ? ' en ' + cur.file.name : ''}: ${e.message}`);
+    } finally { ls.del('mpm_run'); }
+  }
+  S.running = false; $('#prog').hidden = true;
+  if (wl) wl.release().catch(() => {});
+  if (!aborted) note('🔔', 'Proceso terminado: todos los archivos compatibles fueron procesados.');
+}
 
-            if (!mangaName) {
-                mangaName = "Manga";
-                isRecognized = false;
-            }
-
-            return { mangaName, start, end, isRecognized };
-        }
-
-        // --- ANÁLISIS DE ERRORES Y DUPLICADOS ---
-        function analyzeFiles(filesToAnalyze) {
-            state.notifications = [];
-            state.mangaTitleFallback = "Manga";
-
-            if (filesToAnalyze.length === 0) return;
-
-            // Encontrar el nombre más común
-            const nameCounts = {};
-            filesToAnalyze.forEach(file => {
-                if (file.isRecognized && file.mangaName && file.mangaName !== "Manga") {
-                    const norm = file.mangaName.replace(/\s+/g, ' ').trim();
-                    nameCounts[norm] = (nameCounts[norm] || 0) + 1;
-                }
-            });
-
-            let maxCount = 0;
-            Object.entries(nameCounts).forEach(([name, count]) => {
-                if (count > maxCount) {
-                    maxCount = count;
-                    state.mangaTitleFallback = name;
-                }
-            });
-
-            // Ordenar por número
-            filesToAnalyze.sort((a, b) => {
-                if (a.start === null && b.start === null) return 0;
-                if (a.start === null) return 1;
-                if (b.start === null) return -1;
-                return a.start - b.start;
-            });
-
-            const seenRanges = new Set();
-            filesToAnalyze.forEach((file, idx) => {
-                if (!file.isRecognized) {
-                    state.notifications.push({ type: 'warning', title: 'No identificado', text: `Rango desconocido en "${file.name}".`});
-                    file.status = 'warning';
-                    return;
-                }
-
-                if (file.size > 2 * 1024 * 1024 * 1024) {
-                    state.notifications.push({ type: 'error', title: 'Muy grande', text: `"${file.name}" supera los 2 GB.`});
-                    file.status = 'error';
-                }
-
-                const rangeKey = `${file.start}-${file.end}`;
-                if (seenRanges.has(rangeKey)) {
-                    state.notifications.push({ type: 'warning', title: 'Duplicado', text: `Capítulos repetidos: ${rangeKey}.`});
-                    file.status = 'warning';
-                } else {
-                    seenRanges.add(rangeKey);
-                    if (file.status !== 'error') file.status = 'ok';
-                }
-
-                if (idx > 0) {
-                    const prev = filesToAnalyze[idx - 1];
-                    if (prev.end !== null && file.start !== null && file.start > prev.end + 1) {
-                        state.notifications.push({ type: 'info', title: 'Salto detectado', text: `Del cap ${prev.end} al ${file.start}.`});
-                    }
-                }
-            });
-
-            calculateBatches();
-        }
-
-        // --- CÁLCULO DE LOS LOTES (2 GB MAX) ---
-        function calculateBatches() {
-            state.batches = [];
-            const maxSizeBytes = parseInt(maxSizeSelect.value) * 1024 * 1024;
-            
-            let currentBatch = [];
-            let currentSize = 0;
-
-            state.files.forEach(fileObj => {
-                if (fileObj.status === 'error') return;
-
-                if (currentSize + fileObj.size > maxSizeBytes && currentBatch.length > 0) {
-                    state.batches.push(currentBatch);
-                    currentBatch = [];
-                    currentSize = 0;
-                }
-                currentBatch.push(fileObj);
-                currentSize += fileObj.size;
-            });
-
-            if (currentBatch.length > 0) state.batches.push(currentBatch);
-        }
-
-        // --- RENDERIZADO VISUAL ---
-        function render() {
-            updateStatsUI();
-            renderNotifications();
-            renderFileList();
-        }
-
-        function updateStatsUI() {
-            document.getElementById('stat-files').textContent = state.files.length;
-            document.getElementById('stat-size').textContent = formatBytes(state.files.reduce((acc, f) => acc + f.size, 0));
-            document.getElementById('stat-manga').textContent = state.mangaTitleFallback;
-
-            const validStarts = state.files.map(f => f.start).filter(s => s !== null);
-            const validEnds = state.files.map(f => f.end).filter(e => e !== null);
-            document.getElementById('stat-chapters').textContent = validStarts.length > 0 ? `${Math.min(...validStarts)} - ${Math.max(...validEnds)}` : '-';
-            document.getElementById('stat-issues').textContent = state.notifications.length;
-            document.getElementById('stat-batches').textContent = state.batches.length;
-        }
-
-        function renderNotifications() {
-            notificationsList.innerHTML = '';
-            if (state.notifications.length === 0) {
-                notificationsSection.classList.add('hidden');
-                return;
-            }
-            notificationsSection.classList.remove('hidden');
-            state.notifications.forEach(notif => {
-                const div = document.createElement('div');
-                const bgColor = notif.type === 'error' ? 'bg-red-950/40 border-red-800 text-red-200' :
-                                notif.type === 'warning' ? 'bg-amber-950/40 border-amber-800 text-amber-200' :
-                                'bg-purple-950/40 border-purple-800 text-purple-200';
-                div.className = `p-3 rounded-xl border text-xs flex items-start gap-2.5 ${bgColor}`;
-                div.innerHTML = `<span class="text-base">${notif.type === 'error' ? '❌' : notif.type === 'warning' ? '⚠️' : '🔔'}</span>
-                                 <div><p class="font-bold">${notif.title}</p><p class="text-slate-300 mt-0.5">${notif.text}</p></div>`;
-                notificationsList.appendChild(div);
-            });
-        }
-
-        function renderFileList() {
-            fileList.innerHTML = '';
-            state.files.forEach(f => {
-                const li = document.createElement('li');
-                li.dataset.id = f.id;
-                li.className = `p-3 rounded-xl border bg-slate-900/80 border-slate-800/80 flex items-center justify-between gap-3 text-xs animate-fade-in`;
-
-                const badgeColor = f.status === 'processed' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
-                                   f.status === 'warning' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
-                                   f.status === 'error' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                                   'bg-slate-800 text-slate-300 border-slate-700';
-                const statusLabel = f.status === 'processed' ? '✅ Procesado' :
-                                    f.status === 'warning' ? '⚠️ Revisar' :
-                                    f.status === 'error' ? '❌ Error' : '⏳ Pendiente';
-                const capText = f.isRecognized ? `Cap. ${f.start}${f.start !== f.end ? ` - ${f.end}` : ''}` : 'No detectado';
-
-                li.innerHTML = `
-                    <div class="flex items-center gap-3 min-w-0">
-                        <span class="drag-handle cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-300 text-base">☰</span>
-                        <div class="min-w-0">
-                            <p class="font-semibold text-slate-200 truncate">${f.name}</p>
-                            <p class="text-[11px] text-slate-400 mt-0.5">${formatBytes(f.size)} • <span class="text-purple-400 font-medium">${capText}</span></p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <span class="px-2.5 py-1 rounded-lg border text-[10px] font-bold ${badgeColor}">${statusLabel}</span>
-                    </div>
-                `;
-                fileList.appendChild(li);
-            });
-        }
-
-        // --- PROCESAR PDFs (CON CUIDADO PARA LA MEMORIA) ---
-        processBtn.addEventListener('click', async () => {
-            if (state.batches.length === 0) return alert("No hay lotes válidos.");
-
-            state.isProcessing = true;
-            document.getElementById('progress-container').classList.remove('hidden');
-            processBtn.disabled = true;
-            processBtn.classList.add('opacity-50', 'cursor-not-allowed');
-
-            for (let i = 0; i < state.batches.length; i++) {
-                const batch = state.batches[i];
-                const validStarts = batch.map(f => f.start).filter(s => s !== null);
-                const validEnds = batch.map(f => f.end).filter(e => e !== null);
-                const minCap = validStarts.length > 0 ? Math.min(...validStarts) : 1;
-                const maxCap = validEnds.length > 0 ? Math.max(...validEnds) : batch.length;
-                
-                const defaultFilename = `(${minCap} - ${maxCap}) ${state.mangaTitleFallback}`;
-
-                document.getElementById('progress-status-text').textContent = `Procesando Lote ${i + 1} de ${state.batches.length}`;
-                document.getElementById('progress-detail').textContent = `Uniendo archivos...`;
-
-                try {
-                    const mergedPdfDoc = await PDFLib.PDFDocument.create();
-
-                    for (let j = 0; j < batch.length; j++) {
-                        const fileObj = batch[j];
-                        const arrayBuffer = await fileObj.file.arrayBuffer();
-                        const srcDoc = await PDFLib.PDFDocument.load(arrayBuffer);
-                        const copiedPages = await mergedPdfDoc.copyPages(srcDoc, srcDoc.getPageIndices());
-                        copiedPages.forEach(page => mergedPdfDoc.addPage(page));
-
-                        const percent = Math.round(((j + 1) / batch.length) * 100);
-                        document.getElementById('progress-bar').style.width = `${percent}%`;
-                        document.getElementById('progress-percentage').textContent = `${percent}%`;
-                    }
-
-                    const pdfBytes = await mergedPdfDoc.save();
-                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-
-                    batch.forEach(f => f.status = 'processed');
-                    render();
-                    await promptForDownload(blob, defaultFilename);
-
-                } catch (err) {
-                    alert(`Ocurrió un error al procesar: ${err.message}`);
-                }
-            }
-
-            document.getElementById('progress-status-text').textContent = "¡Terminado!";
-            document.getElementById('progress-detail').textContent = "Todos los archivos procesados.";
-            state.isProcessing = false;
-            processBtn.disabled = false;
-            processBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        });
-
-        // --- SISTEMA DE DESCARGA NATIVA ---
-        function promptForDownload(blob, defaultFilename) {
-            return new Promise((resolve) => {
-                downloadFilenameInput.value = defaultFilename;
-                downloadModal.classList.remove('hidden');
-
-                const handleConfirm = (e) => {
-                    e.preventDefault();
-                    const cleanName = downloadFilenameInput.value.trim() || defaultFilename;
-                    const finalFilename = cleanName.toLowerCase().endsWith('.pdf') ? cleanName : `${cleanName}.pdf`;
-
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = finalFilename;
-                    document.body.appendChild(a);
-                    a.click();
-
-                    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
-                    cleanup();
-                    resolve();
-                };
-
-                const handleSkip = (e) => {
-                    e.preventDefault();
-                    cleanup();
-                    resolve();
-                };
-
-                function cleanup() {
-                    downloadModal.classList.add('hidden');
-                    confirmDownloadBtn.removeEventListener('click', handleConfirm);
-                    skipDownloadBtn.removeEventListener('click', handleSkip);
-                }
-
-                confirmDownloadBtn.addEventListener('click', handleConfirm);
-                skipDownloadBtn.addEventListener('click', handleSkip);
-            });
-        }
-
-        // --- UTILIDAD BYTES ---
-        function formatBytes(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-    </script>
+/* ---------- 7. Eventos ---------- */
+$('#file').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+const drop = $('#drop');
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => addFiles([...e.dataTransfer.files]));
+sel.onchange = render;
+$('#go').onclick = run;
+$('#auto').onclick = () => { S.manual = false; render(); };
+$('#clear').onclick = () => {
+  if (S.running || !confirm('¿Limpiar la lista y olvidar los archivos ya procesados?')) return;
+  Object.assign(S, { items: [], events: [], doneBatches: [], manual: false }); doneSet.clear(); ls.del('mpm_done');
+  $('#app').hidden = true; render();
+};
+$('#files').onclick = e => {
+  const b = e.target.closest('button'); if (!b || S.running) return;
+  const n = +b.closest('li').dataset.n, i = S.items[n];
+  if (b.dataset.a === 'rm') S.items.splice(n, 1);
+  if (b.dataset.a === 'keep') S.items.filter(x => x.dupKey === i.dupKey).forEach(x => x.keep = x === i);
+  if (b.dataset.a === 'set') {
+    const m = (prompt(`Capítulos de "${i.file.name}" (ej: 12 o 12-20):`) || '').match(/^\s*(\d+(?:\.\d+)?)\s*(?:[-–]\s*(\d+(?:\.\d+)?))?\s*$/);
+    if (m && (!m[2] || +m[2] >= +m[1])) { i.start = +m[1]; i.end = +(m[2] || m[1]); i.parsed = true; }
+  }
+  $('#app').hidden = !S.items.length; render();
+};
+// Reordenar: arrastre inmediato con ratón; en pantalla táctil, mantener presionado 250 ms
+if (window.Sortable) new Sortable($('#files'), {
+  animation: 150, delay: 250, delayOnTouchOnly: true, touchStartThreshold: 6, filter: 'button', preventOnFilter: false,
+  onEnd() { if (S.running) return render(); S.items = [...$('#files').children].map(li => S.items[+li.dataset.n]); S.manual = true; render(); }
+});
+// Errores inesperados visibles en Notificaciones (en vez de fallar en silencio)
+addEventListener('error', e => note('❌', `Error de JavaScript: ${e.message}`));
+addEventListener('unhandledrejection', e => note('❌', `Error: ${(e.reason && e.reason.message) || e.reason}`));
+render();
+</script>
 </body>
 </html>
