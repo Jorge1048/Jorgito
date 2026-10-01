@@ -24,12 +24,13 @@
       <label>Tamaño máximo por archivo (GB)
         <input id="max" type="number" min="0.1" step="0.1" value="2"></label>
       <button id="go" class="primary">📚 CREAR PDFs</button>
+      <button id="auto" hidden>↕ Orden automático</button>
       <button id="clear">Limpiar</button>
     </div>
     <div class="card" id="prog" hidden></div>
     <div class="card"><h2>🔔 Notificaciones</h2><ul id="notes"></ul></div>
     <div class="card"><h2>Lotes pendientes</h2><div id="batches"></div></div>
-    <div class="card"><h2>Archivos</h2><ul id="files"></ul></div>
+    <div class="card"><h2>Archivos</h2><p class="hint">Mantén presionado un archivo y arrástralo para cambiar su posición.</p><ul id="files"></ul></div>
   </section>
 </main>
 
